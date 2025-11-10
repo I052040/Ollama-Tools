@@ -169,13 +169,13 @@
         <h1>Ollama Tools</h1>
 
         <div class="tab-buttons">
-            <button class="tab-button" onclick="openTab('markdown-tab')">Markdown</button>
+            <button class="tab-button active" onclick="openTab('markdown-tab')">Markdown</button>
             <button class="tab-button" onclick="openTab('vision-tab')">Vision</button>
-            <button class="tab-button active" onclick="openTab('prompt-tab')">Prompt</button>
+            <button class="tab-button" onclick="openTab('prompt-tab')">Prompt</button>
         </div>
 
         <!-- Prompt Tab -->
-        <div id="prompt-tab" class="tab active">
+        <div id="prompt-tab" class="tab">
             <h2>Prompt</h2>
 
             <label for="prompt-model">Available Ollama models:</label>
@@ -213,7 +213,7 @@
         </div>
 
         <!-- Markdown Tab - Now integrated content instead of iframe -->
-        <div id="markdown-tab" class="tab">
+        <div id="markdown-tab" class="tab active">
             <h2>Markdown Editor</h2>
             <div class="tool-bar-container">
                 <div class="model-selector-md">
@@ -334,11 +334,37 @@
                             document.getElementById('image-preview').style.display = 'block';
 
                             // Create a File object from the blob to simulate file upload
-                            const file = new File([blob], 'pasted_image.png', { type: blob.type });
+                            const file = new File([blob], 'temp.png', { type: blob.type });
                             const dataTransfer = new DataTransfer();
                             dataTransfer.items.add(file);
-                            document.getElementById('image-upload').files = dataTransfer.files;
+                            
+                            // Create FormData and send to the server to save the image
+                            const formData = new FormData();
+                            formData.append('image', file);
 
+                            try {
+                                const response = await fetch('/api/save_pasted_image', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+
+                                const data = await response.json();
+                                if (data.error) {
+                                    alert(`Error saving image: ${data.error}`);
+                                    return;
+                                }
+                            } catch (error) {
+                                console.error('Error saving pasted image:', error);
+                                alert(`Error saving image: ${error.message}`);
+                                return;
+                            }
+
+                            document.getElementById('image-upload').files = dataTransfer.files;
+                            alert('Image pasted and saved successfully!');
                             return;
                         }
                     }
@@ -412,13 +438,6 @@
         // Process image
         async function processImage() {
             const model = document.getElementById('vision-model').value;
-            const fileInput = document.getElementById('image-upload');
-            const file = fileInput.files[0];
-
-            if (!file) {
-                alert('Please select an image first.');
-                return;
-            }
 
             if (!model) {
                 alert('Please select a model.');
@@ -432,7 +451,6 @@
             document.getElementById('vision-result').textContent = '';
 
             const formData = new FormData();
-            formData.append('image', file);
             formData.append('selected_model', model);
 
             try {
